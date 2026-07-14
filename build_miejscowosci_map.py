@@ -110,6 +110,8 @@ def build_city_features(rows: list[dict], by_code: dict[str, list[dict]]) -> lis
         city = parse_city_name(city_label)
         kolor = first_lookup(fields.get("Kolor"))
         strefa = first_lookup(fields.get("Notes (from Table 8)"))
+        koszt = first_lookup(fields.get("Koszt"))
+        brutto = fields.get("Brutto")
         rank = strefa_rank(strefa, kolor)
         source = by_code.get(code)
         if not source:
@@ -123,6 +125,8 @@ def build_city_features(rows: list[dict], by_code: dict[str, list[dict]]) -> lis
                 "rank": rank,
                 "kolor": kolor,
                 "strefa": strefa or strefa_label(rank),
+                "koszt_netto": koszt,
+                "brutto": brutto,
                 "geometry": geometry,
             }
         )
@@ -130,12 +134,24 @@ def build_city_features(rows: list[dict], by_code: dict[str, list[dict]]) -> lis
     features: list[dict] = []
     for city, items in sorted(grouped.items()):
         best_rank = min(item["rank"] for item in items)
-        winning_color = color_for_rank(best_rank, fallback=items[0]["kolor"])
+        winning = next(item for item in items if item["rank"] == best_rank)
+        winning_color = color_for_rank(best_rank, fallback=winning["kolor"])
         winning_strefa = strefa_label(best_rank)
         geometry = merge_geometries([item["geometry"] for item in items])
         if not geometry:
             continue
         codes = sorted({item["code"] for item in items})
+        by_code_price: dict[str, dict] = {}
+        for item in sorted(items, key=lambda x: x["code"]):
+            if item["code"] not in by_code_price:
+                by_code_price[item["code"]] = {
+                    "kod": item["code"],
+                    "dojazd_netto": item.get("koszt_netto") or "",
+                    "dojazd_brutto": item.get("brutto") if item.get("brutto") is not None else "",
+                }
+        kody_dojazd = list(by_code_price.values())
+        dojazd_netto = winning.get("koszt_netto") or ""
+        dojazd_brutto = winning.get("brutto")
         features.append(
             {
                 "type": "Feature",
@@ -145,8 +161,11 @@ def build_city_features(rows: list[dict], by_code: dict[str, list[dict]]) -> lis
                     "kolor": winning_color,
                     "strefa": winning_strefa,
                     "strefa_rank": best_rank,
+                    "dojazd_netto": dojazd_netto,
+                    "dojazd_brutto": dojazd_brutto if dojazd_brutto is not None else "",
                     "kody_count": len(codes),
                     "kody": ",".join(codes[:12]) + ("…" if len(codes) > 12 else ""),
+                    "kody_dojazd": json.dumps(kody_dojazd, ensure_ascii=False, separators=(",", ":")),
                 },
             }
         )
@@ -241,7 +260,7 @@ def main() -> None:
 
     by_code = index_geojson_by_code(SLASKIE_GEOJSON)
     rows = list_all_records(
-        ["nazwa", "miasto mapa", "Kolor", "Notes (from Table 8)", "GeoJSON status"]
+        ["nazwa", "miasto mapa", "Kolor", "Notes (from Table 8)", "Koszt", "Brutto", "GeoJSON status"]
     )
     features = build_city_features(rows, by_code)
 
@@ -257,17 +276,17 @@ def main() -> None:
     print(f"Zapisano: {MIASTA_OUT} ({size_kb} KB)")
     print(f"Public (GitHub): {PUBLIC_OUT}")
     print()
-    print("URL do Framera (repo publiczne, branch main):")
-    print("  https://raw.githubusercontent.com/TWOJ_USER/Miejscowosci-geo-json/main/public/miejscowosci-polska.geojson")
-    print("  (zamien TWOJ_USER na swoj login GitHub, potem git push)")
+    print("URL do Framera (GitHub raw, branch master):")
+    print("  https://raw.githubusercontent.com/korfeloskar/Miejscowosci-geo-json/master/public/miejscowosci-polska.geojson")
     print("Przyklady:")
     for feat in features[:8]:
         props = feat["properties"]
-        print(f"  {props['miasto']} — {props['strefa']} ({props['kolor']}), kody: {props['kody_count']}")
+        print(f"  {props['miasto']} — {props['strefa']}, dojazd {props.get('dojazd_netto')} / {props.get('dojazd_brutto')}")
 
     katowice = next((f for f in features if f["properties"]["miasto"] == "Katowice"), None)
     if katowice:
-        print(f"Katowice: {katowice['properties']['strefa']} / {katowice['properties']['kolor']}")
+        p = katowice["properties"]
+        print(f"Katowice: {p['strefa']} / dojazd {p['dojazd_netto']} / {p['dojazd_brutto']}")
 
     if args.upload:
         upload_to_airtable(MIASTA_OUT)

@@ -23,6 +23,73 @@ const POLAND_BOUNDS: maplibregl.LngLatBoundsLike = [
     [24.25, 54.95],
 ]
 
+function formatPln(value: string | number | null | undefined): string {
+    if (value === null || value === undefined || value === "") return ""
+    const num = typeof value === "number" ? value : Number(String(value).replace(",", "."))
+    if (Number.isNaN(num)) return ""
+    return num.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " zł"
+}
+
+type KodDojazd = {
+    kod: string
+    dojazd_netto: string | number
+    dojazd_brutto: string | number
+}
+
+function parseKodyDojazd(raw: unknown): KodDojazd[] {
+    if (!raw) return []
+    if (typeof raw === "string") {
+        try {
+            const parsed = JSON.parse(raw)
+            return Array.isArray(parsed) ? parsed : []
+        } catch {
+            return []
+        }
+    }
+    return Array.isArray(raw) ? raw : []
+}
+
+function cenaKod(kod: KodDojazd): string {
+    const netto = formatPln(kod.dojazd_netto)
+    const brutto = formatPln(kod.dojazd_brutto)
+    if (netto && brutto) return `Dojazd ${netto} netto / ${brutto} brutto`
+    if (netto) return `Dojazd ${netto} netto`
+    if (brutto) return `Dojazd ${brutto} brutto`
+    return "Dojazd —"
+}
+
+function popupHtml(props: Record<string, string | number>): string {
+    const kody = parseKodyDojazd(props.kody_dojazd).sort((a, b) =>
+        String(a.kod).localeCompare(String(b.kod), "pl")
+    )
+
+    const lines = kody.length
+        ? kody
+              .map(
+                  (k) =>
+                      `<div style="margin:4px 0;line-height:1.35"><strong>Kod: ${k.kod}</strong> — ${cenaKod(k)}</div>`
+              )
+              .join("")
+        : (() => {
+              const netto = formatPln(props.dojazd_netto)
+              const brutto = formatPln(props.dojazd_brutto)
+              if (netto && brutto) {
+                  return `<div>Dojazd ${netto} netto / ${brutto} brutto</div>`
+              }
+              return ""
+          })()
+
+    return [
+        `<div style="font-weight:600;margin-bottom:6px">${props.miasto}</div>`,
+        props.strefa ? `<div style="opacity:.85;margin-bottom:8px">${props.strefa}</div>` : "",
+        lines
+            ? `<div style="max-height:220px;overflow-y:auto;padding-right:4px">${lines}</div>`
+            : `<div style="opacity:.75">Brak danych o dojeździe</div>`,
+    ]
+        .filter(Boolean)
+        .join("")
+}
+
 const STREFY = [
     { rank: 0, label: "STREFA 0", color: "#FF0000" },
     { rank: 1, label: "STREFA 1", color: "#FFCD00" },
@@ -91,6 +158,13 @@ export default function MiejscowosciMap(props: Props) {
 
         mapRef.current = map
         map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right")
+
+        map.on("load", () => {
+            const nav = map.getContainer().querySelector(".maplibregl-ctrl-top-right") as HTMLElement | null
+            if (nav) {
+                nav.style.margin = "20px 24px 0 0"
+            }
+        })
 
         const onResize = () => map.resize()
         window.addEventListener("resize", onResize)
@@ -180,7 +254,9 @@ export default function MiejscowosciMap(props: Props) {
                 const popup = new maplibregl.Popup({
                     closeButton: false,
                     closeOnClick: false,
-                    offset: 12,
+                    offset: 20,
+                    className: "pbs-map-popup",
+                    maxWidth: "320px",
                 })
 
                 map.on("mousemove", "miasta-fill", (e) => {
@@ -190,9 +266,7 @@ export default function MiejscowosciMap(props: Props) {
                     map.getCanvas().style.cursor = "pointer"
                     popup
                         .setLngLat(e.lngLat)
-                        .setHTML(
-                            `<strong>${props.miasto}</strong><br/>${props.strefa}<br/><span style="opacity:.75">${props.kody_count} kodów pocztowych</span>`
-                        )
+                        .setHTML(popupHtml(props as Record<string, string | number>))
                         .addTo(map)
                 })
                 map.on("mouseleave", "miasta-fill", () => {
@@ -233,6 +307,20 @@ export default function MiejscowosciMap(props: Props) {
                 rel="stylesheet"
                 href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
             />
+            <style>{`
+                .pbs-map-popup .maplibregl-popup-content {
+                    padding: 12px 14px;
+                    border-radius: 10px;
+                    font-size: 13px;
+                    box-shadow: 0 8px 24px rgba(17, 24, 31, 0.12);
+                }
+                .pbs-map-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+                .pbs-map-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+                .pbs-map-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip,
+                .pbs-map-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+                    margin-top: -1px;
+                }
+            `}</style>
             <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
 
             {loading && (
