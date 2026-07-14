@@ -15,7 +15,6 @@ import argparse
 import base64
 import json
 import os
-import re
 import sys
 import time
 import urllib.error
@@ -34,6 +33,12 @@ from airtable_config import (
     OBSLOGIWANE_TABLE_ID,
     POSTCODES_MAPS_SLASKIE_URL,
 )
+from geojson_utils import (
+    first_lookup,
+    index_geojson_by_code,
+    merge_features,
+    normalize_code,
+)
 
 PAT = os.environ.get("AIRTABLE_PAT", "")
 API = f"https://api.airtable.com/v0/{BASE_ID}"
@@ -41,7 +46,6 @@ META = f"https://api.airtable.com/v0/meta/bases/{BASE_ID}"
 DATA_DIR = Path(__file__).resolve().parent / "data" / "postcodes"
 SLASKIE_GEOJSON = DATA_DIR / "24_SLASKIE_ALL_PC_4326.geojson"
 COMBINED_OUT = DATA_DIR / "obslugiwane-choropleth.geojson"
-CODE_RE = re.compile(r"^(\d{2}-\d{3})$")
 
 
 def request(method: str, url: str, body: dict | None = None) -> dict:
@@ -200,52 +204,10 @@ def download_slaskie_geojson() -> None:
     print(f"Zapisano {SLASKIE_GEOJSON} ({SLASKIE_GEOJSON.stat().st_size // 1024 // 1024} MB)")
 
 
-def normalize_code(value: str) -> str | None:
-    value = (value or "").strip()
-    m = CODE_RE.match(value)
-    if m:
-        return m.group(1)
-    m = re.match(r"^(\d{2}-\d{3})", value)
-    return m.group(1) if m else None
+def parse_city_label(label: str) -> str:
+    from geojson_utils import parse_city_name
 
-
-def polygon_coords(geometry: dict) -> list:
-    gtype = geometry.get("type")
-    if gtype == "Polygon":
-        return [geometry["coordinates"]]
-    if gtype == "MultiPolygon":
-        return geometry["coordinates"]
-    return []
-
-
-def merge_features(features: list[dict]) -> dict:
-    if len(features) == 1:
-        return features[0]
-    polys: list = []
-    for feat in features:
-        polys.extend(polygon_coords(feat["geometry"]))
-    base = dict(features[0])
-    if len(polys) == 1:
-        base["geometry"] = {"type": "Polygon", "coordinates": polys[0]}
-    else:
-        base["geometry"] = {"type": "MultiPolygon", "coordinates": polys}
-    return base
-
-
-def index_geojson_by_code(path: Path) -> dict[str, list[dict]]:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    by_code: dict[str, list[dict]] = defaultdict(list)
-    for feat in data.get("features") or []:
-        code = normalize_code(str(feat.get("properties", {}).get("Name", "")))
-        if code:
-            by_code[code].append(feat)
-    return by_code
-
-
-def first_lookup(values: list | None) -> str:
-    if not values:
-        return ""
-    return str(values[0]).strip()
+    return parse_city_name(label)
 
 
 def build_feature(code: str, source_feats: list[dict], row: dict) -> dict:
@@ -259,7 +221,7 @@ def build_feature(code: str, source_feats: list[dict], row: dict) -> dict:
             "strefa": first_lookup(fields.get("Notes (from Table 8)")),
             "koszt_netto": first_lookup(fields.get("Koszt")),
             "brutto": fields.get("Brutto"),
-            "miasto": first_lookup(fields.get("miasto mapa")),
+            "miasto": parse_city_label(first_lookup(fields.get("miasto mapa"))),
         }
     )
     return {"type": "Feature", "geometry": merged["geometry"], "properties": props}
@@ -341,7 +303,7 @@ def main() -> None:
 
     if args.dry_run:
         print(f"[dry-run] ok={ok} missing={missing} too_large={too_large}")
-        print(f"[dry-run] combined → {COMBINED_OUT} ({COMBINED_OUT.stat().st_size // 1024} KB)")
+        print(f"[dry-run] combined -> {COMBINED_OUT} ({COMBINED_OUT.stat().st_size // 1024} KB)")
         return
 
     n = patch_batch(updates, dry_run=False)

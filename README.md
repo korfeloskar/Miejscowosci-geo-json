@@ -41,6 +41,10 @@ python sync_postcodes_geojson.py --download-only
 # Pełny sync → Airtable (tekst + załączniki + mapa zbiorcza)
 python sync_postcodes_geojson.py
 
+# Mapa miejscowości (scalone poligony + nazwy) → Framer
+python build_miejscowosci_map.py
+python build_miejscowosci_map.py --upload   # + załącznik w Airtable
+
 # Tylko podgląd bez zapisu
 python sync_postcodes_geojson.py --dry-run
 
@@ -55,6 +59,7 @@ python sync_postcodes_geojson.py --upload-map-only
 | `data/postcodes/24_SLASKIE_ALL_PC_4326.geojson` | Źródło PostCodesMaps (~13 MB, gitignore) |
 | `data/postcodes/obslugiwane-choropleth.geojson` | Mapa zbiorcza 763 stref (~5 MB, gitignore) |
 | `data/postcodes/sample_slaskie.geojson` | Mały przykład (w repo) |
+| `public/miejscowosci-polska.geojson` | Mapa miejscowości — hostuj na GitHub raw (~5 MB) |
 
 ## Źródło poligonów
 
@@ -63,5 +68,43 @@ python sync_postcodes_geojson.py --upload-map-only
 ## Framer / strona www
 
 Mapa choropleth korzysta z `obslugiwane-choropleth.geojson` (hosting/CDN) lub składa się z pól `GeoJSON` + `kolor` ze stref w CMS.
+
+### Mapa miejscowości (Code Component)
+
+1. Wygeneruj GeoJSON: `python build_miejscowosci_map.py --upload`
+2. W Framer: **Assets → Code → New Component** → wklej `framer/MiejscowosciMap.tsx`
+3. Dodaj komponent na stronę; w **URL GeoJSON miejscowości** wklej link do pliku (patrz niżej)
+4. Komponent jest responsywny (`width: 100%`, regulowana wysokość)
+
+**Hosting GeoJSON — polecamy GitHub (stały URL, bez Framer Pro):**
+
+1. `python build_miejscowosci_map.py` → zapisuje też `public/miejscowosci-polska.geojson`
+2. Wypchnij na GitHub (repo **publiczne**):
+
+```powershell
+git add public/miejscowosci-polska.geojson
+git commit -m "update mapa miejscowości"
+git push
+```
+
+3. URL do Framera (zamień `TWOJ_USER` na login GitHub):
+
+```
+https://raw.githubusercontent.com/TWOJ_USER/Miejscowosci-geo-json/main/public/miejscowosci-polska.geojson
+```
+
+4. W komponencie **MapaMiejscowosci** → **URL GeoJSON miejscowości** → wklej powyższy link.
+
+Po zmianach w Airtable: ponów krok 1–2 (ten sam URL, Framer odświeży po publish).
+
+| Sposób | Uwagi |
+|--------|--------|
+| **GitHub raw** (zalecane) | Stały URL, darmowe, repo publiczne |
+| **Airtable** załącznik | Link wygasa ~2 h — tylko test |
+| **Framer Files** | Dashboard → domena → Files — wymaga Framer Pro |
+
+Jeśli Framer odrzuci rozszerzenie `.geojson`, zmień nazwę na `miejscowosci-polska.json` przed uploadem.
+
+Reguła kolorów: jedna miejscowość = jeden kolor; przy wielu strefach wygrywa **niższa strefa** (STREFA 0 → 6).
 
 Projekt strony: `G:\Cursor\strona_www` (osobny repozytorium — ten projekt tylko sync GeoJSON).
