@@ -73,6 +73,17 @@ def color_for_rank(rank: int, fallback: str = "#A8A8A8") -> str:
     return fallback
 
 
+def format_price(value: str | int | float | None) -> str:
+    """Cena z dokładnie 2 miejscami po przecinku, np. 24.90."""
+    if value is None or value == "":
+        return ""
+    try:
+        num = float(str(value).replace(",", ".").replace(" ", ""))
+    except ValueError:
+        return ""
+    return f"{num:.2f}"
+
+
 def polygon_coords(geometry: dict) -> list:
     gtype = geometry.get("type")
     if gtype == "Polygon":

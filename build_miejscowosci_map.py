@@ -32,6 +32,7 @@ from airtable_config import (
 from geojson_utils import (
     color_for_rank,
     first_lookup,
+    format_price,
     index_geojson_by_code,
     merge_geometries,
     normalize_code,
@@ -146,12 +147,12 @@ def build_city_features(rows: list[dict], by_code: dict[str, list[dict]]) -> lis
             if item["code"] not in by_code_price:
                 by_code_price[item["code"]] = {
                     "kod": item["code"],
-                    "dojazd_netto": item.get("koszt_netto") or "",
-                    "dojazd_brutto": item.get("brutto") if item.get("brutto") is not None else "",
+                    "dojazd_netto": format_price(item.get("koszt_netto")),
+                    "dojazd_brutto": format_price(item.get("brutto")),
                 }
         kody_dojazd = list(by_code_price.values())
-        dojazd_netto = winning.get("koszt_netto") or ""
-        dojazd_brutto = winning.get("brutto")
+        dojazd_netto = format_price(winning.get("koszt_netto"))
+        dojazd_brutto = format_price(winning.get("brutto"))
         features.append(
             {
                 "type": "Feature",
@@ -162,7 +163,7 @@ def build_city_features(rows: list[dict], by_code: dict[str, list[dict]]) -> lis
                     "strefa": winning_strefa,
                     "strefa_rank": best_rank,
                     "dojazd_netto": dojazd_netto,
-                    "dojazd_brutto": dojazd_brutto if dojazd_brutto is not None else "",
+                    "dojazd_brutto": dojazd_brutto,
                     "kody_count": len(codes),
                     "kody": ",".join(codes[:12]) + ("…" if len(codes) > 12 else ""),
                     "kody_dojazd": json.dumps(kody_dojazd, ensure_ascii=False, separators=(",", ":")),

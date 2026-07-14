@@ -27,7 +27,8 @@ function formatPln(value: string | number | null | undefined): string {
     if (value === null || value === undefined || value === "") return ""
     const num = typeof value === "number" ? value : Number(String(value).replace(",", "."))
     if (Number.isNaN(num)) return ""
-    return num.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " zł"
+    const rounded = Math.round(num * 100) / 100
+    return rounded.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " zł"
 }
 
 type KodDojazd = {
@@ -107,6 +108,13 @@ type Props = {
     labelSize: number
     showLegend: boolean
     borderRadius: number
+    cacheVersion: string
+}
+
+function withCacheBust(url: string, version: string): string {
+    if (!url || !version) return url
+    const sep = url.includes("?") ? "&" : "?"
+    return `${url}${sep}v=${encodeURIComponent(version)}`
 }
 
 export default function MiejscowosciMap(props: Props) {
@@ -117,6 +125,7 @@ export default function MiejscowosciMap(props: Props) {
         labelSize,
         showLegend,
         borderRadius,
+        cacheVersion,
     } = props
 
     const containerRef = useRef<HTMLDivElement>(null)
@@ -171,9 +180,10 @@ export default function MiejscowosciMap(props: Props) {
 
         map.on("load", async () => {
             try {
+                const miastaUrl = withCacheBust(dataUrl, cacheVersion)
                 const [polskaRes, miastaRes] = await Promise.all([
                     fetch(polskaUrl),
-                    fetch(dataUrl),
+                    fetch(miastaUrl),
                 ])
                 if (!polskaRes.ok) throw new Error(`Polska: HTTP ${polskaRes.status}`)
                 if (!miastaRes.ok) throw new Error(`Miejscowości: HTTP ${miastaRes.status}`)
@@ -289,7 +299,7 @@ export default function MiejscowosciMap(props: Props) {
             map.remove()
             mapRef.current = null
         }
-    }, [dataUrl, polskaUrl, labelSize])
+    }, [dataUrl, polskaUrl, labelSize, cacheVersion])
 
     return (
         <div
@@ -416,6 +426,7 @@ MiejscowosciMap.defaultProps = {
     labelSize: 13,
     showLegend: true,
     borderRadius: 12,
+    cacheVersion: "3",
 }
 
 addPropertyControls(MiejscowosciMap, {
