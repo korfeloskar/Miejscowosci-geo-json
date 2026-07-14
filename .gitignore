@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.env
+.env.local
+
+data/postcodes/24_SLASKIE_ALL_PC_4326.geojson
+data/postcodes/obslugiwane-choropleth.geojson
+data/postcodes/*.geojson
+!data/postcodes/sample_slaskie.geojson
