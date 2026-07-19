@@ -148,6 +148,7 @@ export default function MiejscowosciMap(props: Props) {
             container: containerRef.current,
             style: {
                 version: 8,
+                glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
                 sources: {},
                 layers: [
                     {
@@ -241,7 +242,7 @@ export default function MiejscowosciMap(props: Props) {
                     layout: {
                         "text-field": ["get", "miasto"],
                         "text-size": labelSize,
-                        "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+                        "text-font": ["Open Sans Regular"],
                         "text-anchor": "center",
                         "text-allow-overlap": false,
                         "text-ignore-placement": false,

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mapa województw — Polska</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #f7f7f8;
+      font-family: Inter, system-ui, sans-serif;
+      color: #11181F;
+    }
+    #map { width: 100%; height: 100%; }
+    .status {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(247,247,248,0.9);
+      z-index: 2;
+      font-size: 14px;
+      pointer-events: none;
+    }
+    .status.hidden { display: none; }
+    .pbs-map-popup .maplibregl-popup-content {
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      box-shadow: 0 8px 24px rgba(17, 24, 31, 0.12);
+    }
+    .hint {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      z-index: 1;
+      background: rgba(255,255,255,0.94);
+      border: 1px solid #e4e4e7;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 12px;
+      box-shadow: 0 4px 16px rgba(17,24,31,0.08);
+      max-width: calc(100% - 24px);
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="status" class="status">Ładowanie mapy…</div>
+  <div class="hint"><strong>16 województw</strong> — najechanie pokazuje nazwę</div>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script>
+    const POLSKA_URLS = [
+      "./polska-wojewodztwa.geojson",
+      "../framer/polska-wojewodztwa.geojson",
+      "https://raw.githubusercontent.com/korfeloskar/Miejscowosci-geo-json/master/public/polska-wojewodztwa.geojson",
+      "https://raw.githubusercontent.com/andilabs/polska-wojewodztwa-geojson/master/polska-wojewodztwa.geojson",
+    ]
+
+    const NAZWA_PL = {
+      "Lódzkie": "Łódzkie",
+      "Lodzkie": "Łódzkie",
+      "Swietokrzyskie": "Świętokrzyskie",
+      "Wielkopolskie": "Wielkopolskie",
+      "Kujawsko-Pomorskie": "Kujawsko-Pomorskie",
+      "Malopolskie": "Małopolskie",
+      "Dolnoslaskie": "Dolnośląskie",
+      "Lubelskie": "Lubelskie",
+      "Lubuskie": "Lubuskie",
+      "Mazowieckie": "Mazowieckie",
+      "Opolskie": "Opolskie",
+      "Podlaskie": "Podlaskie",
+      "Pomorskie": "Pomorskie",
+      "Slaskie": "Śląskie",
+      "Podkarpackie": "Podkarpackie",
+      "Warminsko-Mazurskie": "Warmińsko-Mazurskie",
+      "Zachodniopomorskie": "Zachodniopomorskie",
+      "Greater Poland": "Wielkopolskie",
+      "Kuyavian-Pomeranian": "Kujawsko-Pomorskie",
+      "Lesser Poland": "Małopolskie",
+      "Lower Silesian": "Dolnośląskie",
+      "Lublin": "Lubelskie",
+      "Lubusz": "Lubuskie",
+      "Masovian": "Mazowieckie",
+      "Opole": "Opolskie",
+      "Podlachian": "Podlaskie",
+      "Pomeranian": "Pomorskie",
+      "Silesian": "Śląskie",
+      "Subcarpathian": "Podkarpackie",
+      "Warmian-Masurian": "Warmińsko-Mazurskie",
+      "West Pomeranian": "Zachodniopomorskie",
+      "Łódź": "Łódzkie",
+      "Świętokrzyskie": "Świętokrzyskie",
+    }
+
+    function nazwaWoj(props) {
+      const raw = String((props && (props.name || props.NAME_1)) || "").trim()
+      return NAZWA_PL[raw] || raw || "Województwo"
+    }
+
+    function withPolishLabels(geojson) {
+      return {
+        type: "FeatureCollection",
+        features: geojson.features.map((f) => {
+          const props = Object.assign({}, f.properties || {})
+          const label = nazwaWoj(props)
+          props.nazwa = label
+          props.label = label
+          return Object.assign({}, f, { properties: props })
+        }),
+      }
+    }
+
+    async function loadGeojson() {
+      let lastErr
+      for (const url of POLSKA_URLS) {
+        try {
+          const res = await fetch(url)
+          if (!res.ok) throw new Error("HTTP " + res.status + " " + url)
+          return withPolishLabels(await res.json())
+        } catch (err) {
+          lastErr = err
+        }
+      }
+      throw lastErr || new Error("Brak GeoJSON województw")
+    }
+
+    const statusEl = document.getElementById("status")
+    const map = new maplibregl.Map({
+      container: "map",
+      style: {
+        version: 8,
+        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+        sources: {},
+        layers: [{
+          id: "background",
+          type: "background",
+          paint: { "background-color": "#f7f7f8" },
+        }],
+      },
+      bounds: [[14.05, 49.0], [24.25, 54.95]],
+      fitBoundsOptions: { padding: 24 },
+      attributionControl: false,
+      dragRotate: false,
+      pitchWithRotate: false,
+      touchPitch: false,
+    })
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right")
+
+    map.on("load", async () => {
+      try {
+        const polska = await loadGeojson()
+        map.addSource("wojewodztwa", {
+          type: "geojson",
+          data: polska,
+          promoteId: "HASC_1",
+        })
+        map.addLayer({
+          id: "woj-fill",
+          type: "fill",
+          source: "wojewodztwa",
+          paint: {
+            "fill-color": [
+              "case",
+              ["boolean", ["feature-state", "hover"], false],
+              "#d4d4d8",
+              "#ececef",
+            ],
+            "fill-opacity": 1,
+          },
+        })
+        map.addLayer({
+          id: "woj-line",
+          type: "line",
+          source: "wojewodztwa",
+          paint: {
+            "line-color": "#11181F",
+            "line-width": 1.8,
+            "line-opacity": 0.85,
+          },
+        })
+        map.addLayer({
+          id: "woj-labels",
+          type: "symbol",
+          source: "wojewodztwa",
+          layout: {
+            "text-field": ["get", "nazwa"],
+            "text-size": 12,
+            "text-font": ["Open Sans Regular"],
+            "text-anchor": "center",
+            "text-allow-overlap": false,
+            "text-padding": 4,
+            "text-max-width": 10,
+          },
+          paint: {
+            "text-color": "#11181F",
+            "text-halo-color": "#ffffff",
+            "text-halo-width": 1.5,
+          },
+        })
+
+        let hoveredId
+        const popup = new maplibregl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+          offset: 16,
+          className: "pbs-map-popup",
+          maxWidth: "240px",
+        })
+
+        map.on("mousemove", "woj-fill", (e) => {
+          if (!e.features || !e.features.length) return
+          const feature = e.features[0]
+          const id = feature.id
+          map.getCanvas().style.cursor = "pointer"
+          if (hoveredId !== undefined && hoveredId !== id) {
+            map.setFeatureState({ source: "wojewodztwa", id: hoveredId }, { hover: false })
+          }
+          if (id !== undefined && id !== null) {
+            hoveredId = id
+            map.setFeatureState({ source: "wojewodztwa", id: hoveredId }, { hover: true })
+          }
+          const name = (feature.properties && feature.properties.nazwa) || "Województwo"
+          popup.setLngLat(e.lngLat).setHTML("<div style=\"font-weight:600\">" + name + "</div>").addTo(map)
+        })
+        map.on("mouseleave", "woj-fill", () => {
+          map.getCanvas().style.cursor = ""
+          if (hoveredId !== undefined) {
+            map.setFeatureState({ source: "wojewodztwa", id: hoveredId }, { hover: false })
+            hoveredId = undefined
+          }
+          popup.remove()
+        })
+
+        statusEl.classList.add("hidden")
+      } catch (err) {
+        statusEl.textContent = err && err.message ? err.message : "Błąd ładowania mapy"
+      }
+    })
+  </script>
+</body>
+</html>

@@ -45,6 +45,10 @@ python sync_postcodes_geojson.py
 python build_miejscowosci_map.py
 python build_miejscowosci_map.py --upload   # + załącznik w Airtable
 
+# Agregacja: wszystkie 16 województw ← kody z MIEJSCOWOŚCI
+python sync_wojewodztwa_kody.py --dry-run
+python sync_wojewodztwa_kody.py
+
 # Tylko podgląd bez zapisu
 python sync_postcodes_geojson.py --dry-run
 
@@ -60,6 +64,8 @@ python sync_postcodes_geojson.py --upload-map-only
 | `data/postcodes/obslugiwane-choropleth.geojson` | Mapa zbiorcza 763 stref (~5 MB, gitignore) |
 | `data/postcodes/sample_slaskie.geojson` | Mały przykład (w repo) |
 | `public/miejscowosci-polska.geojson` | Mapa miejscowości — hostuj na GitHub raw (~5 MB) |
+| `public/polska-wojewodztwa.geojson` | Mapa województw — hostuj na GitHub raw |
+| `data/wojewodztwa_kody_report.json` | Raport agregacji 16 województw ← kody |
 
 ## Źródło poligonów
 
@@ -106,5 +112,33 @@ Po zmianach w Airtable: ponów krok 1–2 (ten sam URL, Framer odświeży po pub
 Jeśli Framer odrzuci rozszerzenie `.geojson`, zmień nazwę na `miejscowosci-polska.json` przed uploadem.
 
 Reguła kolorów: jedna miejscowość = jeden kolor; przy wielu strefach wygrywa **niższa strefa** (STREFA 0 → 6).
+
+### Mapa województw (Code Component)
+
+1. Przygotuj GeoJSON: `python prepare_wojewodztwa_map.py` → `public/polska-wojewodztwa.geojson`
+2. Podgląd lokalny: otwórz `public/mapa-wojewodztw.html`
+3. W Framer: **Assets → Code → New Component** → wklej `framer/WojewodztwaMap.tsx`
+4. URL GeoJSON (repo archiwum, branch `master`):
+
+```
+https://raw.githubusercontent.com/korfeloskar/Miejscowosci-geo-json/master/public/polska-wojewodztwa.geojson
+```
+
+| Plik | Opis |
+|------|------|
+| `public/polska-wojewodztwa.geojson` | Obrysy 16 województw (GitHub raw) |
+| `public/mapa-wojewodztw.html` | Podgląd MapLibre |
+| `framer/WojewodztwaMap.tsx` | Komponent Framer |
+
+### Agregacja województw (wszystkie 16)
+
+Tabela **Województwa** dostaje linki do kodów z **MIEJSCOWOŚCI** (pełne 16 województw).
+
+```powershell
+python sync_wojewodztwa_kody.py --dry-run   # podgląd liczb
+python sync_wojewodztwa_kody.py             # tworzy pole «Kody» + wpisuje posty
+```
+
+Źródło przypisania: istniejący lookup **Województwo** na MIEJSCOWOŚCI (hierarchia Gmina → Powiat → Województwo).
 
 Projekt strony: `G:\Cursor\strona_www` (osobny repozytorium — ten projekt tylko sync GeoJSON).

@@ -5,6 +5,8 @@ OBSLOGIWANE_TABLE = "🚗 Obsługiwane"
 OBSLOGIWANE_TABLE_ID = "tblnKU6URo3lHtSpW"
 KOD_TABLE = "MIEJSCOWOŚCI"
 KOD_TABLE_ID = "tbli2KZwzyGzu3Wah"
+WOJ_TABLE = "Województwa"
+WOJ_TABLE_ID = "tblcpDWgAK4r9OFwE"
 STREFY_TABLE = "Strefy"
 STREFY_TABLE_ID = "tblS1EdNfBXvfgoHD"
 

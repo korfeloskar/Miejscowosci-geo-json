@@ -1,0 +1,87 @@
+{
+  "wojewodztwa": [
+    {
+      "nazwa": "DOLNOŚLĄSKIE",
+      "record_id": "recSYUPNbyOjVHZ6j",
+      "kody_count": 1786
+    },
+    {
+      "nazwa": "KUJAWSKO-POMORSKIE",
+      "record_id": "recWPR16YlI6Wl1lq",
+      "kody_count": 1086
+    },
+    {
+      "nazwa": "LUBELSKIE",
+      "record_id": "recihQCLf32vk9mDg",
+      "kody_count": 943
+    },
+    {
+      "nazwa": "LUBUSKIE",
+      "record_id": "rec7xslxmZGm5XAys",
+      "kody_count": 549
+    },
+    {
+      "nazwa": "ŁÓDZKIE",
+      "record_id": "reclrJtX7t0zcFiE9",
+      "kody_count": 1994
+    },
+    {
+      "nazwa": "MAŁOPOLSKIE",
+      "record_id": "recq7qcCfnrIS9Srg",
+      "kody_count": 1578
+    },
+    {
+      "nazwa": "MAZOWIECKIE",
+      "record_id": "recPUAAlC3N2gYjp1",
+      "kody_count": 4785
+    },
+    {
+      "nazwa": "OPOLSKIE",
+      "record_id": "recVI4ke3kT5oCSEk",
+      "kody_count": 708
+    },
+    {
+      "nazwa": "PODKARPACKIE",
+      "record_id": "rec5Di8fbzZ4y0kzu",
+      "kody_count": 581
+    },
+    {
+      "nazwa": "PODLASKIE",
+      "record_id": "recg3DqGgBRDrPggy",
+      "kody_count": 974
+    },
+    {
+      "nazwa": "POMORSKIE",
+      "record_id": "recvh9FZADcthK83O",
+      "kody_count": 1730
+    },
+    {
+      "nazwa": "ŚLĄSKIE",
+      "record_id": "recyBMzNcrdVWtxbi",
+      "kody_count": 1890
+    },
+    {
+      "nazwa": "ŚWIĘTOKRZYSKIE",
+      "record_id": "rec9J2oNCdlLjWqWV",
+      "kody_count": 646
+    },
+    {
+      "nazwa": "WARMIŃSKO-MAZURSKIE",
+      "record_id": "recTTyNMz4TTgPrCq",
+      "kody_count": 353
+    },
+    {
+      "nazwa": "WIELKOPOLSKIE",
+      "record_id": "recbHB7iTnJfN7OsT",
+      "kody_count": 1807
+    },
+    {
+      "nazwa": "ZACHODNIOPOMORSKIE",
+      "record_id": "recFlqJrMR4jr8NsG",
+      "kody_count": 2019
+    }
+  ],
+  "miejscowosci_total": 23457,
+  "assigned": 23429,
+  "missing_wojewodztwo": 28
+}
