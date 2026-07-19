@@ -1,0 +1,4 @@
+Source: mbroton/polish-geonames (PRNG / Państwowy Rejestr Nazw Geograficznych via dane.gov.pl)
+License: CC BY 4.0
+Version: v0.3.0, valid as of 2025-01-01
+Upstream: https://github.com/mbroton/polish-geonames

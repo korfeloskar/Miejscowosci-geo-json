@@ -113,21 +113,49 @@ Jeśli Framer odrzuci rozszerzenie `.geojson`, zmień nazwę na `miejscowosci-po
 
 Reguła kolorów: jedna miejscowość = jeden kolor; przy wielu strefach wygrywa **niższa strefa** (STREFA 0 → 6).
 
-### Mapa województw (Code Component)
+### Mapa województw + miejscowości (Code Component)
 
-1. Przygotuj GeoJSON: `python prepare_wojewodztwa_map.py` → `public/polska-wojewodztwa.geojson`
-2. Podgląd lokalny: otwórz `public/mapa-wojewodztw.html`
-3. W Framer: **Assets → Code → New Component** → wklej `framer/WojewodztwaMap.tsx`
-4. URL GeoJSON (repo archiwum, branch `master`):
+Miejscowości **nie pochodzą z Airtable** — z otwartego GitHub:
+[mbroton/polish-geonames](https://github.com/mbroton/polish-geonames) (PRNG / dane.gov.pl, **CC BY 4.0**, v0.3.0, ~44 631 punktów).
 
+```powershell
+python build_miejscowosci_prng.py --download   # źródło → data/external/
+python build_miejscowosci_prng.py              # → public/*.geojson + wojewodztwa-map-data.json
+```
+
+1. Przygotuj obrysy: `python prepare_wojewodztwa_map.py` → `public/polska-wojewodztwa.geojson`
+2. W Framer: **Assets → Code → New Component** → wklej `framer/WojewodztwaMap.tsx`
+3. Wklej URL-e (branch `master`):
+
+**Województwa (obrysy):**
 ```
 https://raw.githubusercontent.com/korfeloskar/Miejscowosci-geo-json/master/public/polska-wojewodztwa.geojson
 ```
 
+**Miejscowości — domyślnie miasta (~1020, lekkie):**
+```
+https://raw.githubusercontent.com/korfeloskar/Miejscowosci-geo-json/master/public/miasta-prng.geojson
+```
+
+**Pełna warstwa miasta+wsie (~44k):**
+```
+https://raw.githubusercontent.com/korfeloskar/Miejscowosci-geo-json/master/public/miejscowosci-prng.geojson
+```
+
+**Listy per województwo (JSON pod CMS / zakładkę):**
+```
+https://raw.githubusercontent.com/korfeloskar/Miejscowosci-geo-json/master/public/wojewodztwa-map-data.json
+```
+
+Props Framer: włącz **Pokaż miejscowości**, ustaw **URL GeoJSON miejscowości**, po update danych zwiększ **Cache version**.
+
 | Plik | Opis |
 |------|------|
-| `public/polska-wojewodztwa.geojson` | Obrysy 16 województw (GitHub raw) |
-| `public/mapa-wojewodztw.html` | Podgląd MapLibre |
+| `public/polska-wojewodztwa.geojson` | Obrysy 16 województw |
+| `public/miasta-prng.geojson` | Punkty miast (PRNG) |
+| `public/miejscowosci-prng.geojson` | Punkty miast + wsi (PRNG) |
+| `public/wojewodztwa-map-data.json` | 16 woj. + `cities` / `miejscowosci` |
+| `data/external/polish-geonames.json` | Surowy zrzut źródła |
 | `framer/WojewodztwaMap.tsx` | Komponent Framer |
 
 ### Agregacja województw (wszystkie 16)

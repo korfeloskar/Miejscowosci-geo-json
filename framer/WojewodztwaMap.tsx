@@ -1,11 +1,15 @@
 /**
- * Mapa Polski — obrysowane województwa (GeoJSON).
+ * Mapa Polski — województwa + miejscowości (punkty PRNG).
  *
  * Framer: Assets → Code → New Code Component → wklej ten plik.
  * Wymaga pakietu: maplibre-gl (Framer doinstaluje przy imporcie).
  *
- * Stack i styl jak MiejscowosciMap — tło + granice + etykiety + hover.
- * Domyślny URL: lokalny plik w repo / GitHub raw / andilabs CDN.
+ * Dane (GitHub raw, branch master):
+ *  - polska-wojewodztwa.geojson — obrysy 16 województw
+ *  - miasta-prng.geojson — ~1020 miast (domyślnie, lekkie)
+ *  - miejscowosci-prng.geojson — ~44k miast+wsi (pełna warstwa)
+ *
+ * Źródło miejscowości: mbroton/polish-geonames (PRNG, CC BY 4.0) — nie Airtable.
  */
 
 import { addPropertyControls, ControlType } from "framer"
@@ -14,6 +18,9 @@ import { useEffect, useRef, useState } from "react"
 
 const POLSKA_URL =
     "https://raw.githubusercontent.com/korfeloskar/Miejscowosci-geo-json/master/public/polska-wojewodztwa.geojson"
+
+const MIEJSCOWOSCI_URL =
+    "https://raw.githubusercontent.com/korfeloskar/Miejscowosci-geo-json/master/public/miasta-prng.geojson"
 
 const POLAND_BOUNDS: maplibregl.LngLatBoundsLike = [
     [14.05, 49.0],
@@ -84,13 +91,32 @@ function withPolishLabels(geojson: {
     }
 }
 
-function popupHtml(props: Record<string, string | number>): string {
+function wojPopupHtml(props: Record<string, string | number>): string {
     const name = String(props.nazwa || props.label || props.name || "Województwo")
     return `<div style="font-weight:600">${name}</div>`
 }
 
+function miejscePopupHtml(props: Record<string, string | number>): string {
+    const name = String(props.nazwa || props.name || props.miasto || "Miejscowość")
+    const rodzaj = String(props.rodzaj || props.type || "")
+    const woj = String(props.wojewodztwo || "")
+    const powiat = String(props.powiat || "")
+    const gmina = String(props.gmina || "")
+    const lines = [
+        `<div style="font-weight:600;margin-bottom:4px">${name}</div>`,
+        rodzaj ? `<div style="opacity:.85">${rodzaj}</div>` : "",
+        woj ? `<div style="opacity:.85">woj. ${woj}</div>` : "",
+        powiat ? `<div style="opacity:.75">powiat ${powiat}</div>` : "",
+        gmina ? `<div style="opacity:.75">gmina ${gmina}</div>` : "",
+    ]
+    return lines.filter(Boolean).join("")
+}
+
 type Props = {
     polskaUrl: string
+    miejscowosciUrl: string
+    showMiejscowosci: boolean
+    showMiejscowosciLabels: boolean
     height: number
     labelSize: number
     borderWidth: number
@@ -108,6 +134,9 @@ function withCacheBust(url: string, version: string): string {
 export default function WojewodztwaMap(props: Props) {
     const {
         polskaUrl,
+        miejscowosciUrl,
+        showMiejscowosci,
+        showMiejscowosciLabels,
         height,
         labelSize,
         borderWidth,
@@ -156,6 +185,14 @@ export default function WojewodztwaMap(props: Props) {
 
         mapRef.current = map
         map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right")
+        map.addControl(
+            new maplibregl.AttributionControl({
+                compact: true,
+                customAttribution:
+                    'Miejscowości: <a href="https://github.com/mbroton/polish-geonames">PRNG / polish-geonames</a> (CC BY 4.0)',
+            }),
+            "bottom-right"
+        )
 
         map.on("load", () => {
             const nav = map.getContainer().querySelector(".maplibregl-ctrl-top-right") as HTMLElement | null
@@ -169,8 +206,8 @@ export default function WojewodztwaMap(props: Props) {
 
         map.on("load", async () => {
             try {
-                const url = withCacheBust(polskaUrl, cacheVersion)
-                const res = await fetch(url)
+                const wojUrl = withCacheBust(polskaUrl, cacheVersion)
+                const res = await fetch(wojUrl)
                 if (!res.ok) throw new Error(`Województwa: HTTP ${res.status}`)
 
                 const raw = await res.json()
@@ -230,17 +267,150 @@ export default function WojewodztwaMap(props: Props) {
                     })
                 }
 
+                if (showMiejscowosci && miejscowosciUrl) {
+                    const mUrl = withCacheBust(miejscowosciUrl, cacheVersion)
+                    const mRes = await fetch(mUrl)
+                    if (!mRes.ok) throw new Error(`Miejscowości: HTTP ${mRes.status}`)
+                    const miejsca = await mRes.json()
+                    if (cancelled) return
+
+                    map.addSource("miejscowosci", {
+                        type: "geojson",
+                        data: miejsca,
+                        cluster: true,
+                        clusterMaxZoom: 10,
+                        clusterRadius: 42,
+                    })
+
+                    map.addLayer({
+                        id: "miejsca-clusters",
+                        type: "circle",
+                        source: "miejscowosci",
+                        filter: ["has", "point_count"],
+                        paint: {
+                            "circle-color": "#11181F",
+                            "circle-opacity": 0.72,
+                            "circle-radius": [
+                                "step",
+                                ["get", "point_count"],
+                                14,
+                                25,
+                                18,
+                                100,
+                                24,
+                                500,
+                                30,
+                            ],
+                        },
+                    })
+
+                    map.addLayer({
+                        id: "miejsca-cluster-count",
+                        type: "symbol",
+                        source: "miejscowosci",
+                        filter: ["has", "point_count"],
+                        layout: {
+                            "text-field": ["get", "point_count_abbreviated"],
+                            "text-font": ["Open Sans Regular"],
+                            "text-size": 11,
+                        },
+                        paint: {
+                            "text-color": "#ffffff",
+                        },
+                    })
+
+                    map.addLayer({
+                        id: "miejsca-points",
+                        type: "circle",
+                        source: "miejscowosci",
+                        filter: ["!", ["has", "point_count"]],
+                        paint: {
+                            "circle-color": [
+                                "match",
+                                ["get", "type"],
+                                "city",
+                                "#11181F",
+                                "#52525b",
+                            ],
+                            "circle-radius": [
+                                "match",
+                                ["get", "type"],
+                                "city",
+                                4.5,
+                                3,
+                            ],
+                            "circle-stroke-width": 1,
+                            "circle-stroke-color": "#ffffff",
+                            "circle-opacity": 0.9,
+                        },
+                    })
+
+                    if (showMiejscowosciLabels) {
+                        map.addLayer({
+                            id: "miejsca-labels",
+                            type: "symbol",
+                            source: "miejscowosci",
+                            filter: [
+                                "all",
+                                ["!", ["has", "point_count"]],
+                                ["==", ["get", "type"], "city"],
+                            ],
+                            minzoom: 7,
+                            layout: {
+                                "text-field": ["get", "nazwa"],
+                                "text-size": Math.max(10, labelSize - 2),
+                                "text-font": ["Open Sans Regular"],
+                                "text-offset": [0, 1.1],
+                                "text-anchor": "top",
+                                "text-optional": true,
+                            },
+                            paint: {
+                                "text-color": "#11181F",
+                                "text-halo-color": "#ffffff",
+                                "text-halo-width": 1.2,
+                            },
+                        })
+                    }
+
+                    map.on("click", "miejsca-clusters", (e) => {
+                        const features = map.queryRenderedFeatures(e.point, {
+                            layers: ["miejsca-clusters"],
+                        })
+                        const clusterId = features[0]?.properties?.cluster_id
+                        const source = map.getSource("miejscowosci") as maplibregl.GeoJSONSource
+                        if (clusterId == null) return
+                        source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+                            if (err || zoom == null || !features[0].geometry) return
+                            const geom = features[0].geometry as {
+                                type: string
+                                coordinates: [number, number]
+                            }
+                            map.easeTo({
+                                center: geom.coordinates,
+                                zoom,
+                            })
+                        })
+                    })
+                }
+
                 let hoveredId: string | number | undefined
                 const popup = new maplibregl.Popup({
                     closeButton: false,
                     closeOnClick: false,
                     offset: 16,
                     className: "pbs-map-popup",
-                    maxWidth: "240px",
+                    maxWidth: "260px",
                 })
 
                 map.on("mousemove", "woj-fill", (e) => {
                     if (!e.features?.length) return
+                    // Nie nadpisuj popupu gdy kursor jest nad punktem miejscowości
+                    if (showMiejscowosci && miejscowosciUrl) {
+                        const overPoint = map.queryRenderedFeatures(e.point, {
+                            layers: ["miejsca-points"].filter((id) => map.getLayer(id)),
+                        })
+                        if (overPoint.length) return
+                    }
                     const feature = e.features[0]
                     const id = feature.id
                     map.getCanvas().style.cursor = "pointer"
@@ -257,7 +427,7 @@ export default function WojewodztwaMap(props: Props) {
                     if (!props) return
                     popup
                         .setLngLat(e.lngLat)
-                        .setHTML(popupHtml(props as Record<string, string | number>))
+                        .setHTML(wojPopupHtml(props as Record<string, string | number>))
                         .addTo(map)
                 })
 
@@ -269,6 +439,29 @@ export default function WojewodztwaMap(props: Props) {
                     }
                     popup.remove()
                 })
+
+                if (showMiejscowosci && miejscowosciUrl) {
+                    map.on("mousemove", "miejsca-points", (e) => {
+                        if (!e.features?.length) return
+                        map.getCanvas().style.cursor = "pointer"
+                        const props = e.features[0].properties
+                        if (!props) return
+                        popup
+                            .setLngLat(e.lngLat)
+                            .setHTML(miejscePopupHtml(props as Record<string, string | number>))
+                            .addTo(map)
+                    })
+                    map.on("mouseleave", "miejsca-points", () => {
+                        map.getCanvas().style.cursor = ""
+                        popup.remove()
+                    })
+                    map.on("mouseenter", "miejsca-clusters", () => {
+                        map.getCanvas().style.cursor = "pointer"
+                    })
+                    map.on("mouseleave", "miejsca-clusters", () => {
+                        map.getCanvas().style.cursor = ""
+                    })
+                }
 
                 setLoading(false)
             } catch (err) {
@@ -285,7 +478,16 @@ export default function WojewodztwaMap(props: Props) {
             map.remove()
             mapRef.current = null
         }
-    }, [polskaUrl, labelSize, borderWidth, showLabels, cacheVersion])
+    }, [
+        polskaUrl,
+        miejscowosciUrl,
+        showMiejscowosci,
+        showMiejscowosciLabels,
+        labelSize,
+        borderWidth,
+        showLabels,
+        cacheVersion,
+    ])
 
     return (
         <div
@@ -360,12 +562,15 @@ export default function WojewodztwaMap(props: Props) {
 
 WojewodztwaMap.defaultProps = {
     polskaUrl: POLSKA_URL,
+    miejscowosciUrl: MIEJSCOWOSCI_URL,
+    showMiejscowosci: true,
+    showMiejscowosciLabels: true,
     height: 560,
     labelSize: 12,
     borderWidth: 1.8,
     showLabels: true,
     borderRadius: 12,
-    cacheVersion: "1",
+    cacheVersion: "2",
 }
 
 addPropertyControls(WojewodztwaMap, {
@@ -373,7 +578,24 @@ addPropertyControls(WojewodztwaMap, {
         type: ControlType.String,
         title: "URL GeoJSON województw",
         defaultValue: POLSKA_URL,
-        description: "polska-wojewodztwa.geojson (GitHub raw lub CDN)",
+        description: "polska-wojewodztwa.geojson (GitHub raw)",
+    },
+    miejscowosciUrl: {
+        type: ControlType.String,
+        title: "URL GeoJSON miejscowości",
+        defaultValue: MIEJSCOWOSCI_URL,
+        description:
+            "miasta-prng.geojson (~1k miast) lub miejscowosci-prng.geojson (~44k miast+wsi)",
+    },
+    showMiejscowosci: {
+        type: ControlType.Boolean,
+        title: "Pokaż miejscowości",
+        defaultValue: true,
+    },
+    showMiejscowosciLabels: {
+        type: ControlType.Boolean,
+        title: "Etykiety miast",
+        defaultValue: true,
     },
     height: {
         type: ControlType.Number,
@@ -411,5 +633,11 @@ addPropertyControls(WojewodztwaMap, {
         min: 0,
         max: 32,
         step: 2,
+    },
+    cacheVersion: {
+        type: ControlType.String,
+        title: "Cache version",
+        defaultValue: "2",
+        description: "Zwiększ po update danych (np. 3), żeby Framer pobrał świeże pliki",
     },
 })
